@@ -2,7 +2,7 @@ const md5 = require('crypto-js/md5')
 
 const { admin, db, firebase } = require('../utils/admin')
 const { loginValidator, signUpValidator, detailsValidator } = require('../utils/validators')
-const config = require('../../firebaseconf')
+const config = require('../firebaseconf')
 
 exports.handleSignUp = (req, res) => {
   const user = { ...req.body }
@@ -130,8 +130,8 @@ exports.createDetails = (req, res) => {
   }
 }
 
-exports.getDetails = (req, res) => {
-  const user = { likes: [] }
+exports.getCurrentUserDetails = (req, res) => {
+  const user = { likes: [], notifications: [] }
 
   db.doc(`/users/${req.user.handle}`).get()
     .then(doc => {
@@ -141,8 +141,34 @@ exports.getDetails = (req, res) => {
       }
     })
     .then(querySnapshot => {
-      querySnapshot.forEach(doc => user.likes.push(doc.data))
+      querySnapshot.forEach(doc => user.likes.push(doc.data()))
+      return db.collection('notifications').where('recipient', '==', req.user.handle).orderBy('createdAt', 'desc')
+        .limit(10)
+        .get()
+    })
+    .then(querySnapshot => {
+      querySnapshot.forEach(doc => user.notifications.push({ id: doc.id, ...doc.data() }))
       return res.status(200).json(user)
     })
-    .catch(err => (res.status(500).json({ error: err.code })))
+    .catch(err => (res.status(500).json({ error: err })))
+}
+
+exports.getDetails = (req, res) => {
+  const userDetails = { recipes: [] }
+
+  db.doc(`/users/${req.params.handle}`).get()
+    .then(doc => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: 'User not found' })
+      }
+
+      userDetails.user = doc.data()
+      return db.collection('recipes').where('userHandle', '==', req.params.handle)
+        .orderBy('createdAt', 'desc').get()
+        .then(querySnapshot => {
+          querySnapshot.forEach(doc => userDetails.recipes.push({ id: doc.id, ...doc.data() }))
+          return res.status(200).json(userDetails)
+        })
+    })
+    .catch(err => (res.status(500).json({ error: err })))
 }

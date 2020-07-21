@@ -10,7 +10,8 @@ const {
   handleLogin,
   uploadProfilePicture,
   createDetails,
-  getCurrentUserDetails
+  getCurrentUserDetails,
+  getDetails
 } = require('./handlers/user')
 
 const {
@@ -33,6 +34,7 @@ app.post('/login', handleLogin)
 app.post('/user/profile-picture', firebaseAuthorizationMiddleware, uploadProfilePicture)
 app.post('/user/details', firebaseAuthorizationMiddleware, createDetails)
 app.get('/user/details', firebaseAuthorizationMiddleware, getCurrentUserDetails)
+app.get('/user/:handle', getDetails)
 
 // Recipe routes
 app.get('/recipe', firebaseAuthorizationMiddleware, getAllRecipes)
