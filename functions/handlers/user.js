@@ -2,7 +2,7 @@ const md5 = require('crypto-js/md5')
 
 const { admin, db, firebase } = require('../utils/admin')
 const { loginValidator, signUpValidator, detailsValidator } = require('../utils/validators')
-const config = require('../../firebaseconfig')
+const config = require('../../firebaseconf')
 
 exports.handleSignUp = (req, res) => {
   const user = { ...req.body }
