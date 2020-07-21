@@ -91,3 +91,28 @@ exports.onCommentNotification = functions.region('europe-west3').firestore.docum
       })
       .catch(err => { console.log(err) })
   })
+
+exports.onBookmarkNotification = functions.region('europe-west3').firestore.document('bookmarks/{id}')
+  .onCreate(querySnapshot => {
+    db.doc(`/recipes/${querySnapshot.data().recipeId}`).get()
+      .then(doc => {
+        if (doc.exists) {
+          return db.doc(`/notifications/${querySnapshot.id}`).set({
+            recipeId: doc.id,
+            type: 'comment',
+            read: false,
+            sender: querySnapshot.data().userHandle,
+            recipient: doc.data().userHandle,
+            createdAt: new Date().toISOString()
+          })
+        }
+      })
+      .catch(err => { console.log(err) })
+  })
+
+exports.onUnlikeRemoveNotification = functions.region('europe-west3').firestore.document('bookmarks/{id}')
+  .onDelete(querySnapshot => {
+    db.doc(`/bookmarks/${querySnapshot.id}`)
+      .delete()
+      .catch(err => { console.log(err) })
+  })
