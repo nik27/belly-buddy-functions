@@ -73,3 +73,21 @@ exports.onUnlikeRemoveNotification = functions.region('europe-west3').firestore.
       .delete()
       .catch(err => { console.log(err) })
   })
+
+exports.onCommentNotification = functions.region('europe-west3').firestore.document('comments/{id}')
+  .onCreate(querySnapshot => {
+    db.doc(`/recipes/${querySnapshot.data().recipeId}`).get()
+      .then(doc => {
+        if (doc.exists) {
+          return db.doc(`/notifications/${querySnapshot.id}`).set({
+            recipeId: doc.id,
+            type: 'comment',
+            read: false,
+            sender: querySnapshot.data().userHandle,
+            recipient: doc.data().userHandle,
+            createdAt: new Date().toISOString()
+          })
+        }
+      })
+      .catch(err => { console.log(err) })
+  })
