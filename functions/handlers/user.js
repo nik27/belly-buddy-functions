@@ -172,3 +172,13 @@ exports.getDetails = (req, res) => {
     })
     .catch(err => (res.status(500).json({ error: err })))
 }
+
+exports.markNotificationAsRead = (req, res) => {
+  const batch = db.batch()
+
+  req.body.forEach(id => batch.update(db.doc(`/notifications/${id}`), { read: true }))
+
+  batch.commit()
+    .then(() => (res.status(200).json({ message: 'Notifications read' })))
+    .catch(err => res.status(500).json({ error: err }))
+}

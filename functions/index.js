@@ -11,7 +11,8 @@ const {
   uploadProfilePicture,
   createDetails,
   getCurrentUserDetails,
-  getDetails
+  getDetails,
+  markNotificationAsRead
 } = require('./handlers/user')
 
 const {
@@ -35,6 +36,7 @@ app.post('/user/profile-picture', firebaseAuthorizationMiddleware, uploadProfile
 app.post('/user/details', firebaseAuthorizationMiddleware, createDetails)
 app.get('/user/details', firebaseAuthorizationMiddleware, getCurrentUserDetails)
 app.get('/user/:handle', getDetails)
+app.post('/notifications/mark', firebaseAuthorizationMiddleware, markNotificationAsRead)
 
 // Recipe routes
 app.get('/recipe', firebaseAuthorizationMiddleware, getAllRecipes)
@@ -101,7 +103,7 @@ exports.onBookmarkNotification = functions.region('europe-west3').firestore.docu
         if (doc.exists) {
           return db.doc(`/notifications/${querySnapshot.id}`).set({
             recipeId: doc.id,
-            type: 'comment',
+            type: 'bookmark',
             read: false,
             sender: querySnapshot.data().userHandle,
             recipient: doc.data().userHandle,
@@ -112,7 +114,7 @@ exports.onBookmarkNotification = functions.region('europe-west3').firestore.docu
       .catch(err => { console.log(err) })
   })
 
-exports.onUnlikeRemoveNotification = functions.region('europe-west3').firestore.document('bookmarks/{id}')
+exports.onBookmarkRemoveNotification = functions.region('europe-west3').firestore.document('bookmarks/{id}')
   .onDelete(querySnapshot => {
     db.doc(`/bookmarks/${querySnapshot.id}`)
       .delete()
