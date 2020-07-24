@@ -26,8 +26,16 @@
     "validator": "^13.1.1"
   },
   "devDependencies": {
+    "eslint": "^7.5.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-config-standard": "^14.1.1",
+    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^3.1.4",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1",
     "firebase-functions-test": "^0.2.0",
-    "standard": "^14.3.4"
+    "prettier": "^2.0.5"
   },
   "private": true
 }
