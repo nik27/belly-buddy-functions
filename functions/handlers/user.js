@@ -44,16 +44,16 @@ exports.handleSignUp = (req, res) => {
         createdAt: new Date().toISOString(),
         email: user.email,
         handle: user.handle,
-        imgUrl: `https://gravatar.com/avatar/${emailHash}?d=identicon`
+        profilePicture: `https://gravatar.com/avatar/${emailHash}?d=identicon`
       }
       return db.doc(`/users/${user.handle}`).set(credentials)
     })
     .then(() => res.status(201).json({ token }))
     .catch(err => {
-      if (err.code === 'auth/email-already-in-use') {
+      if (err === 'auth/email-already-in-use') {
         res.status(400).json({ email: 'Email already in use :(' })
       } else {
-        res.status(500).json({ error: err.code })
+        res.status(500).json({ error: err })
       }
     })
 }
@@ -116,11 +116,11 @@ exports.uploadProfilePicture = (req, res) => {
         }
       })
       .then(() => {
-        const imgUrl = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/users%2F${req.user.uid}%2F${imgFilename}?alt=media`
-        return db.doc(`/users/${req.user.handle}`).update({ imgUrl })
+        const profilePicture = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/users%2F${req.user.uid}%2F${imgFilename}?alt=media`
+        return db.doc(`/users/${req.user.handle}`).update({ profilePicture })
       })
       .then(() => res.json({ message: 'Image uploaded successfully' }))
-      .catch(err => res.status(500).json({ error: err.code }))
+      .catch(err => res.status(500).json({ error: err }))
   })
 
   busboy.end(req.rawBody)
@@ -135,7 +135,7 @@ exports.createDetails = (req, res) => {
       .then(() =>
         res.status(201).json({ message: 'Details added successfully' })
       )
-      .catch(err => res.status(500).json({ error: err.code }))
+      .catch(err => res.status(500).json({ error: err }))
   } else {
     return res.status(400).json({ message: 'No data to add' })
   }
