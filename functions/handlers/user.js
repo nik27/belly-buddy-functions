@@ -202,7 +202,7 @@ exports.getDetails = (req, res) => {
     .catch(err => res.status(500).json({ error: err }))
 }
 
-exports.getNotification = (req, res) => {
+exports.getInitialNotification = (req, res) => {
   const notifications = []
 
   db.collection('notifications')

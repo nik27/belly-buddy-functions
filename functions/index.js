@@ -12,13 +12,13 @@ const {
   createDetails,
   getCurrentUserDetails,
   getDetails,
-  getNotification,
+  getInitialNotification,
   getNotificationRange,
   markNotificationAsRead
 } = require('./handlers/user')
 
 const {
-  getAllRecipes,
+  getInitialRecipe,
   getRecipe,
   createRecipe,
   deleteRecipe,
@@ -44,7 +44,11 @@ app.get('/user/details', firebaseAuthorizationMiddleware, getCurrentUserDetails)
 app.get('/user/:handle', getDetails)
 
 // Notification handling routes
-app.get('/notification', firebaseAuthorizationMiddleware, getNotification)
+app.get(
+  '/notification',
+  firebaseAuthorizationMiddleware,
+  getInitialNotification
+)
 app.get(
   '/notification/:createdAt',
   firebaseAuthorizationMiddleware,
@@ -57,7 +61,7 @@ app.post(
 )
 
 // Recipe routes
-app.get('/recipe', firebaseAuthorizationMiddleware, getAllRecipes)
+app.get('/recipe', firebaseAuthorizationMiddleware, getInitialRecipe)
 app.get('/recipe/:id', getRecipe)
 app.post('/recipe', firebaseAuthorizationMiddleware, createRecipe)
 app.delete('/recipe/:id', firebaseAuthorizationMiddleware, deleteRecipe)
