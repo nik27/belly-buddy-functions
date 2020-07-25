@@ -175,7 +175,14 @@ exports.likeRecipe = (req, res) => {
     .then(doc => {
       if (doc.exists) {
         recipe = { id: doc.id, ...doc.data() }
-        return likeDocRef.get()
+
+        if (recipe.user_handle === req.user.handle) {
+          return res
+            .status(400)
+            .json({ error: "You can't like your own recipe" })
+        } else {
+          return likeDocRef.get()
+        }
       } else {
         return res.status(404).json({ error: 'Recipe not found' })
       }
@@ -194,7 +201,7 @@ exports.likeRecipe = (req, res) => {
         return res.status(400).json({ error: 'Recipe already liked' })
       }
     })
-    .catch(err => res.status(500).json({ error: err.code }))
+    .catch(err => res.status(500).json({ error: err }))
 }
 
 exports.unlikeRecipe = (req, res) => {
@@ -212,7 +219,14 @@ exports.unlikeRecipe = (req, res) => {
     .then(doc => {
       if (doc.exists) {
         recipe = { id: doc.id, ...doc.data() }
-        return likeDocRef.get()
+
+        if (recipe.user_handle === req.user.handle) {
+          return res
+            .status(400)
+            .json({ error: "You can't unlike your own recipe" })
+        } else {
+          return likeDocRef.get()
+        }
       } else {
         return res.status(404).json({ error: 'Recipe not found' })
       }
@@ -249,7 +263,14 @@ exports.bookmarkRecipe = (req, res) => {
     .then(doc => {
       if (doc.exists) {
         recipe = { id: doc.id, ...doc.data() }
-        return bookmarkDocRef.get()
+
+        if (recipe.user_handle === req.user.handle) {
+          return res
+            .status(400)
+            .json({ error: "You can't bookmark your own recipe" })
+        } else {
+          return bookmarkDocRef.get()
+        }
       } else {
         return res.status(404).json({ error: 'Recipe not found' })
       }
@@ -286,7 +307,14 @@ exports.removeBookmarkRecipe = (req, res) => {
     .then(doc => {
       if (doc.exists) {
         recipe = { id: doc.id, ...doc.data() }
-        return bookmarkDocRef.get()
+
+        if (recipe.user_handle === req.user.handle) {
+          return res
+            .status(400)
+            .json({ error: "You can't remove bookmark from your own recipe" })
+        } else {
+          return bookmarkDocRef.get()
+        }
       } else {
         return res.status(404).json({ error: 'Recipe not found' })
       }
