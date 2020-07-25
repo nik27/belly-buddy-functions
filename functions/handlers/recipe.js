@@ -2,9 +2,10 @@ const { db } = require('../utils/admin')
 
 const { commentValidator } = require('../utils/validators')
 
-exports.getAllRecipes = (req, res) => {
+exports.getInitialRecipe = (req, res) => {
   db.collection('recipes')
     .orderBy('createdAt', 'desc')
+    .limit(10)
     .get()
     .then(querySnapshot => {
       const recipes = []
@@ -14,13 +15,32 @@ exports.getAllRecipes = (req, res) => {
 
       return res.json(recipes)
     })
-    .catch(err => (res.status(500).json({ error: err.code })))
+    .catch(err => res.status(500).json({ error: err }))
+}
+
+exports.getRecipeRange = (req, res) => {
+  const recipes = []
+  const lastRecipeDate = req.params.createdAt
+
+  db.collection('recipes')
+    .where('createdAt', '<', lastRecipeDate)
+    .orderBy('createdAt', 'desc')
+    .limit(10)
+    .get()
+    .then(querySnapshot => {
+      querySnapshot.forEach(doc => {
+        recipes.push({ id: doc.id, ...doc.data() })
+      })
+      return res.status(200).json(recipes)
+    })
+    .catch(err => res.status(500).json({ error: err }))
 }
 
 exports.getRecipe = (req, res) => {
   let recipe
 
-  db.doc(`/recipes/${req.params.id}`).get()
+  db.doc(`/recipes/${req.params.id}`)
+    .get()
     .then(doc => {
       if (!doc.exists) {
         return res.status(404).json({ message: 'Recipe not found' })
@@ -28,7 +48,11 @@ exports.getRecipe = (req, res) => {
 
       recipe = doc.data()
       recipe.id = doc.id
-      return db.collection('comments').orderBy('createdAt', 'desc').where('recipeId', '==', req.params.id).get()
+      return db
+        .collection('comments')
+        .orderBy('createdAt', 'desc')
+        .where('recipeId', '==', req.params.id)
+        .get()
     })
     .then(querySnapshot => {
       recipe.comments = []
@@ -38,7 +62,7 @@ exports.getRecipe = (req, res) => {
       })
       return res.status(200).json(recipe)
     })
-    .catch(err => (res.status(500).json({ error: err })))
+    .catch(err => res.status(500).json({ error: err }))
 }
 
 exports.createRecipe = (req, res) => {
@@ -54,14 +78,16 @@ exports.createRecipe = (req, res) => {
 
   db.collection('recipes')
     .add(newRecipe)
-    .then(doc => (res.status(201).json({ id: doc.id, ...newRecipe })))
-    .catch(err => (res.status(500).json({ error: err.code })))
+    .then(doc => res.status(201).json({ id: doc.id, ...newRecipe }))
+    .catch(err => res.status(500).json({ error: err.code }))
 }
 
 exports.deleteRecipe = (req, res) => {
   const recipe = db.doc(`/recipes/${req.params.id}`)
+  const batch = db.batch()
 
-  recipe.get()
+  recipe
+    .get()
     .then(doc => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Recipe not found' })
@@ -73,8 +99,37 @@ exports.deleteRecipe = (req, res) => {
         return recipe.delete()
       }
     })
-    .then(() => (res.status(200).json({ message: 'Recipe deleted successfully' })))
-    .catch(err => (res.status(500).json({ error: err.code })))
+    .then(() => {
+      return db.collection('likes').where('recipeId', '==', req.params.id).get()
+    })
+    .then(querySnapshot => {
+      querySnapshot.forEach(doc => {
+        batch.delete(db.doc(`/likes/${doc.id}`))
+      })
+      return db
+        .collection('comments')
+        .where('recipeId', '==', req.params.id)
+        .get()
+    })
+    .then(querySnapshot => {
+      querySnapshot.forEach(doc => {
+        batch.delete(db.doc(`/comments/${doc.id}`))
+      })
+      return db
+        .collection('bookmarks')
+        .where('recipeId', '==', req.params.id)
+        .get()
+    })
+    .then(querySnapshot => {
+      querySnapshot.forEach(doc => {
+        batch.delete(db.doc(`/bookmarks/${doc.id}`))
+      })
+    })
+    .then(() => batch.commit())
+    .then(() =>
+      res.status(200).json({ message: 'Recipe deleted successfully' })
+    )
+    .catch(err => res.status(500).json({ error: err.code }))
 }
 
 exports.createComment = (req, res) => {
@@ -92,26 +147,31 @@ exports.createComment = (req, res) => {
     body: validatedComment.body
   }
 
-  db.doc(`/recipes/${req.params.id}`).get()
+  db.doc(`/recipes/${req.params.id}`)
+    .get()
     .then(doc => {
       if (!doc.exists) {
         res.status(404).json({ error: 'Recipe not found' })
       }
       return doc.ref.update({ commentCount: doc.data().commentCount + 1 })
     })
-    .then(() => (db.collection('comments').add(comment)))
-    .then(() => (res.status(201).json(comment)))
-    .catch(err => (res.status(500).json({ error: err.code })))
+    .then(() => db.collection('comments').add(comment))
+    .then(() => res.status(201).json(comment))
+    .catch(err => res.status(500).json({ error: err.code }))
 }
 
 exports.likeRecipe = (req, res) => {
-  const likeDocRef = db.collection('likes').where('userHandle', '==', req.user.handle)
-    .where('recipeId', '==', req.params.id).limit(1)
+  const likeDocRef = db
+    .collection('likes')
+    .where('userHandle', '==', req.user.handle)
+    .where('recipeId', '==', req.params.id)
+    .limit(1)
   const recipeDocRef = db.doc(`/recipes/${req.params.id}`)
 
   let recipe
 
-  recipeDocRef.get()
+  recipeDocRef
+    .get()
     .then(doc => {
       if (doc.exists) {
         recipe = { id: doc.id, ...doc.data() }
@@ -122,27 +182,33 @@ exports.likeRecipe = (req, res) => {
     })
     .then(querySnapshot => {
       if (querySnapshot.empty) {
-        return db.collection('likes').add({ recipeId: recipe.id, userHandle: req.user.handle })
+        return db
+          .collection('likes')
+          .add({ recipeId: recipe.id, userHandle: req.user.handle })
           .then(() => {
             recipe.likeCount++
             return recipeDocRef.update({ likeCount: recipe.likeCount })
           })
-          .then(() => (res.status(201).json(recipe)))
+          .then(() => res.status(201).json(recipe))
       } else {
         return res.status(400).json({ error: 'Recipe already liked' })
       }
     })
-    .catch(err => (res.status(500).json({ error: err.code })))
+    .catch(err => res.status(500).json({ error: err.code }))
 }
 
 exports.unlikeRecipe = (req, res) => {
-  const likeDocRef = db.collection('likes').where('userHandle', '==', req.user.handle)
-    .where('recipeId', '==', req.params.id).limit(1)
+  const likeDocRef = db
+    .collection('likes')
+    .where('userHandle', '==', req.user.handle)
+    .where('recipeId', '==', req.params.id)
+    .limit(1)
   const recipeDocRef = db.doc(`/recipes/${req.params.id}`)
 
   let recipe
 
-  recipeDocRef.get()
+  recipeDocRef
+    .get()
     .then(doc => {
       if (doc.exists) {
         recipe = { id: doc.id, ...doc.data() }
@@ -153,27 +219,33 @@ exports.unlikeRecipe = (req, res) => {
     })
     .then(querySnapshot => {
       if (!querySnapshot.empty) {
-        return db.doc(`/likes/${querySnapshot.docs[0].id}`).delete()
+        return db
+          .doc(`/likes/${querySnapshot.docs[0].id}`)
+          .delete()
           .then(() => {
             recipe.likeCount--
             return recipeDocRef.update({ likeCount: recipe.likeCount })
           })
-          .then(() => (res.status(200).json(recipe)))
+          .then(() => res.status(200).json(recipe))
       } else {
         return res.status(400).json({ error: 'Recipe not liked' })
       }
     })
-    .catch(err => (res.status(500).json({ error: err.code })))
+    .catch(err => res.status(500).json({ error: err.code }))
 }
 
 exports.bookmarkRecipe = (req, res) => {
-  const bookmarkDocRef = db.collection('bookmarks').where('userHandle', '==', req.user.handle)
-    .where('recipeId', '==', req.params.id).limit(1)
+  const bookmarkDocRef = db
+    .collection('bookmarks')
+    .where('userHandle', '==', req.user.handle)
+    .where('recipeId', '==', req.params.id)
+    .limit(1)
   const recipeDocRef = db.doc(`/recipes/${req.params.id}`)
 
   let recipe
 
-  recipeDocRef.get()
+  recipeDocRef
+    .get()
     .then(doc => {
       if (doc.exists) {
         recipe = { id: doc.id, ...doc.data() }
@@ -184,27 +256,33 @@ exports.bookmarkRecipe = (req, res) => {
     })
     .then(querySnapshot => {
       if (querySnapshot.empty) {
-        return db.collection('bookmarks').add({ recipeId: recipe.id, userHandle: req.user.handle })
+        return db
+          .collection('bookmarks')
+          .add({ recipeId: recipe.id, userHandle: req.user.handle })
           .then(() => {
             recipe.bookmarkCount++
             return recipeDocRef.update({ bookmarkCount: recipe.bookmarkCount })
           })
-          .then(() => (res.status(201).json(recipe)))
+          .then(() => res.status(201).json(recipe))
       } else {
         return res.status(400).json({ error: 'Recipe already bookmarked' })
       }
     })
-    .catch(err => (res.status(500).json({ error: err.code })))
+    .catch(err => res.status(500).json({ error: err.code }))
 }
 
 exports.removeBookmarkRecipe = (req, res) => {
-  const bookmarkDocRef = db.collection('bookmarks').where('userHandle', '==', req.user.handle)
-    .where('recipeId', '==', req.params.id).limit(1)
+  const bookmarkDocRef = db
+    .collection('bookmarks')
+    .where('userHandle', '==', req.user.handle)
+    .where('recipeId', '==', req.params.id)
+    .limit(1)
   const recipeDocRef = db.doc(`/recipes/${req.params.id}`)
 
   let recipe
 
-  recipeDocRef.get()
+  recipeDocRef
+    .get()
     .then(doc => {
       if (doc.exists) {
         recipe = { id: doc.id, ...doc.data() }
@@ -215,15 +293,17 @@ exports.removeBookmarkRecipe = (req, res) => {
     })
     .then(querySnapshot => {
       if (!querySnapshot.empty) {
-        return db.doc(`/bookmarks/${querySnapshot.docs[0].id}`).delete()
+        return db
+          .doc(`/bookmarks/${querySnapshot.docs[0].id}`)
+          .delete()
           .then(() => {
             recipe.bookmarkCount--
             return recipeDocRef.update({ bookmarkCount: recipe.bookmarkCount })
           })
-          .then(() => (res.status(200).json(recipe)))
+          .then(() => res.status(200).json(recipe))
       } else {
         return res.status(400).json({ error: 'Recipe not bookmarked' })
       }
     })
-    .catch(err => (res.status(500).json({ error: err.code })))
+    .catch(err => res.status(500).json({ error: err.code }))
 }
