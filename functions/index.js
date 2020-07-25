@@ -202,11 +202,9 @@ exports.onProfiePictureChange = functions
             .get()
             .then(querySnapshot => {
               querySnapshot.forEach(doc =>
-                batch.update(
-                  db.doc(`/comments/${doc.id}`, {
-                    profilePicture: change.after.data().profilePicture
-                  })
-                )
+                batch.update(db.doc(`/comments/${doc.id}`), {
+                  profilePicture: change.after.data().profilePicture
+                })
               )
               return batch.commit()
             })
@@ -214,6 +212,8 @@ exports.onProfiePictureChange = functions
         .catch(err => {
           console.log(err)
         })
+    } else {
+      return true
     }
   })
 
