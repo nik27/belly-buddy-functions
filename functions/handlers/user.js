@@ -72,12 +72,9 @@ exports.handleLogin = (req, res) => {
     .signInWithEmailAndPassword(user.email, user.password)
     .then(data => data.user.getIdToken())
     .then(token => res.json({ token }))
+    // eslint-disable-next-line handle-callback-err
     .catch(err => {
-      if (err.code === 'auth/wrong-password') {
-        return res.status(403).json({ general: 'Wrong credentials' })
-      } else {
-        return res.status(500).json({ error: err.code })
-      }
+      return res.status(403).json({ general: 'Wrong credentials' })
     })
 }
 
