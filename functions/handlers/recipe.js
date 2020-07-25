@@ -136,7 +136,7 @@ exports.createComment = (req, res) => {
   const { validatedComment, valid } = commentValidator(req.body)
 
   if (!valid) {
-    return res.status(400).json({ message: 'Must not be empty' })
+    return res.status(400).json({ comment: 'Must not be empty' })
   }
 
   const comment = {
