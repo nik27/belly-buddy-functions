@@ -174,3 +174,83 @@ exports.onBookmarkRemoveNotification = functions
         console.log(err)
       })
   })
+
+exports.onProfiePictureChange = functions
+  .region('europe-west3')
+  .firestore.document('users/{id}')
+  .onUpdate(change => {
+    if (
+      change.before.data().profilePicture !== change.after.data().profilePicture
+    ) {
+      const batch = db.batch()
+
+      return db
+        .collection('recipes')
+        .where('userHandle', '==', change.before.data().handle)
+        .get()
+        .then(querySnapshot => {
+          querySnapshot.forEach(doc =>
+            batch.update(db.doc(`/recipes/${doc.id}`), {
+              profilePicture: change.after.data().profilePicture
+            })
+          )
+        })
+        .then(() => {
+          return db
+            .collection('comments')
+            .where('userHandle', '==', change.before.data().handle)
+            .get()
+            .then(querySnapshot => {
+              querySnapshot.forEach(doc =>
+                batch.update(
+                  db.doc(`/comments/${doc.id}`, {
+                    profilePicture: change.after.data().profilePicture
+                  })
+                )
+              )
+              return batch.commit()
+            })
+        })
+        .catch(err => {
+          console.log(err)
+        })
+    }
+  })
+
+exports.onRecipeDelete = functions
+  .region('europe-west3')
+  .firestore.document('/recipes/{id}')
+  .onDelete((snapshot, context) => {
+    const id = context.params.id
+    const batch = db.batch()
+
+    return db
+      .collection('comments')
+      .where('recipeId', '==', id)
+      .get()
+      .then(querySnapshot => {
+        querySnapshot.forEach(doc =>
+          batch.delete(db.doc(`/comments/${doc.id}`))
+        )
+        return db.collection('likes').where('recipeId', '==', id).get()
+      })
+      .then(querySnapshot => {
+        querySnapshot.forEach(doc => batch.delete(db.doc(`/likes/${doc.id}`)))
+        return db.collection('bookmarks').where('recipeId', '==', id).get()
+      })
+      .then(querySnapshot => {
+        querySnapshot.forEach(doc =>
+          batch.delete(db.doc(`/bookmarks/${doc.id}`))
+        )
+        return db.collection('notifications').where('recipeId', '==', id).get()
+      })
+      .then(querySnapshot => {
+        querySnapshot.forEach(doc =>
+          batch.delete(db.doc(`/notifications/${doc.id}`))
+        )
+        return batch.commit()
+      })
+      .catch(err => {
+        console.log(err)
+      })
+  })

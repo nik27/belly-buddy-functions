@@ -69,7 +69,7 @@ exports.createRecipe = (req, res) => {
   const newRecipe = {
     userHandle: req.user.handle,
     body: req.body.body,
-    imgUrl: req.user.imgUrl,
+    profilePicture: req.user.profilePicture,
     likeCount: 0,
     commentCount: 0,
     bookmarkCount: 0,
@@ -79,12 +79,11 @@ exports.createRecipe = (req, res) => {
   db.collection('recipes')
     .add(newRecipe)
     .then(doc => res.status(201).json({ id: doc.id, ...newRecipe }))
-    .catch(err => res.status(500).json({ error: err.code }))
+    .catch(err => res.status(500).json({ error: err }))
 }
 
 exports.deleteRecipe = (req, res) => {
   const recipe = db.doc(`/recipes/${req.params.id}`)
-  const batch = db.batch()
 
   recipe
     .get()
@@ -92,44 +91,16 @@ exports.deleteRecipe = (req, res) => {
       if (!doc.exists) {
         return res.status(404).json({ error: 'Recipe not found' })
       }
-
       if (doc.data().userHandle !== req.user.handle) {
         return res.status(403).json({ error: 'Unauthorized' })
       } else {
         return recipe.delete()
       }
     })
-    .then(() => {
-      return db.collection('likes').where('recipeId', '==', req.params.id).get()
-    })
-    .then(querySnapshot => {
-      querySnapshot.forEach(doc => {
-        batch.delete(db.doc(`/likes/${doc.id}`))
-      })
-      return db
-        .collection('comments')
-        .where('recipeId', '==', req.params.id)
-        .get()
-    })
-    .then(querySnapshot => {
-      querySnapshot.forEach(doc => {
-        batch.delete(db.doc(`/comments/${doc.id}`))
-      })
-      return db
-        .collection('bookmarks')
-        .where('recipeId', '==', req.params.id)
-        .get()
-    })
-    .then(querySnapshot => {
-      querySnapshot.forEach(doc => {
-        batch.delete(db.doc(`/bookmarks/${doc.id}`))
-      })
-    })
-    .then(() => batch.commit())
     .then(() =>
       res.status(200).json({ message: 'Recipe deleted successfully' })
     )
-    .catch(err => res.status(500).json({ error: err.code }))
+    .catch(err => res.status(500).json({ error: err }))
 }
 
 exports.createComment = (req, res) => {
@@ -143,7 +114,7 @@ exports.createComment = (req, res) => {
     recipeId: req.params.id,
     createdAt: new Date().toISOString(),
     userHandle: req.user.handle,
-    userImg: req.user.imgUrl,
+    profilePicture: req.user.profilePicture,
     body: validatedComment.body
   }
 
@@ -157,7 +128,7 @@ exports.createComment = (req, res) => {
     })
     .then(() => db.collection('comments').add(comment))
     .then(() => res.status(201).json(comment))
-    .catch(err => res.status(500).json({ error: err.code }))
+    .catch(err => res.status(500).json({ error: err }))
 }
 
 exports.likeRecipe = (req, res) => {
@@ -245,7 +216,7 @@ exports.unlikeRecipe = (req, res) => {
         return res.status(400).json({ error: 'Recipe not liked' })
       }
     })
-    .catch(err => res.status(500).json({ error: err.code }))
+    .catch(err => res.status(500).json({ error: err }))
 }
 
 exports.bookmarkRecipe = (req, res) => {
@@ -289,7 +260,7 @@ exports.bookmarkRecipe = (req, res) => {
         return res.status(400).json({ error: 'Recipe already bookmarked' })
       }
     })
-    .catch(err => res.status(500).json({ error: err.code }))
+    .catch(err => res.status(500).json({ error: err }))
 }
 
 exports.removeBookmarkRecipe = (req, res) => {
@@ -333,5 +304,5 @@ exports.removeBookmarkRecipe = (req, res) => {
         return res.status(400).json({ error: 'Recipe not bookmarked' })
       }
     })
-    .catch(err => res.status(500).json({ error: err.code }))
+    .catch(err => res.status(500).json({ error: err }))
 }
