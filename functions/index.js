@@ -83,7 +83,8 @@ exports.onLikeNotification = functions
   .region('europe-west3')
   .firestore.document('likes/{id}')
   .onCreate(querySnapshot => {
-    db.doc(`/recipes/${querySnapshot.data().recipeId}`)
+    return db
+      .doc(`/recipes/${querySnapshot.data().recipeId}`)
       .get()
       .then(doc => {
         if (doc.exists) {
@@ -106,7 +107,8 @@ exports.onUnlikeRemoveNotification = functions
   .region('europe-west3')
   .firestore.document('likes/{id}')
   .onDelete(querySnapshot => {
-    db.doc(`/notifications/${querySnapshot.id}`)
+    return db
+      .doc(`/notifications/${querySnapshot.id}`)
       .delete()
       .catch(err => {
         console.log(err)
@@ -117,7 +119,8 @@ exports.onCommentNotification = functions
   .region('europe-west3')
   .firestore.document('comments/{id}')
   .onCreate(querySnapshot => {
-    db.doc(`/recipes/${querySnapshot.data().recipeId}`)
+    return db
+      .doc(`/recipes/${querySnapshot.data().recipeId}`)
       .get()
       .then(doc => {
         if (doc.exists) {
@@ -140,7 +143,8 @@ exports.onBookmarkNotification = functions
   .region('europe-west3')
   .firestore.document('bookmarks/{id}')
   .onCreate(querySnapshot => {
-    db.doc(`/recipes/${querySnapshot.data().recipeId}`)
+    return db
+      .doc(`/recipes/${querySnapshot.data().recipeId}`)
       .get()
       .then(doc => {
         if (doc.exists) {
@@ -163,7 +167,8 @@ exports.onBookmarkRemoveNotification = functions
   .region('europe-west3')
   .firestore.document('bookmarks/{id}')
   .onDelete(querySnapshot => {
-    db.doc(`/bookmarks/${querySnapshot.id}`)
+    return db
+      .doc(`/bookmarks/${querySnapshot.id}`)
       .delete()
       .catch(err => {
         console.log(err)
