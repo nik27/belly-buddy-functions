@@ -26,6 +26,7 @@ module.exports = (req, res, next) => {
     .then(querySnapshot => {
       req.user.handle = querySnapshot.docs[0].data().handle
       req.user.profilePicture = querySnapshot.docs[0].data().profilePicture
+      req.user.name = querySnapshot.docs[0].data().name
       return next()
     })
     .catch(err => res.status(403).json(err))

@@ -26,11 +26,13 @@
   },
   "dependencies": {
     "busboy": "^0.3.1",
+    "cors": "^2.8.5",
     "crypto-js": "^4.0.0",
     "express": "^4.17.1",
     "firebase": "^7.16.1",
     "firebase-admin": "^8.10.0",
     "firebase-functions": "^3.6.1",
+    "uuidv4": "^6.2.3",
     "validator": "^13.1.1"
   },
   "devDependencies": {

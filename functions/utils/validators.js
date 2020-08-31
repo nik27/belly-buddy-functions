@@ -9,6 +9,10 @@ exports.signUpValidator = data => {
     errors.email = 'Must be valid email address'
   }
 
+  if (validator.isEmpty(data.name, { ignore_whitespace: true })) {
+    errors.handle = 'Must not be empty'
+  }
+
   if (validator.isEmpty(data.handle, { ignore_whitespace: true })) {
     errors.handle = 'Must not be empty'
   }
@@ -49,7 +53,7 @@ exports.loginValidator = data => {
 exports.detailsValidator = data => {
   const validatedData = {}
 
-  if (!validator.isEmpty((data.bio), { ignore_whitespace: true })) {
+  if (!validator.isEmpty(data.bio, { ignore_whitespace: true })) {
     validatedData.bio = data.bio.trim()
   }
 

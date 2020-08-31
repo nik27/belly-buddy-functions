@@ -1,4 +1,5 @@
 const app = require('express')()
+const cors = require('cors')({ origin: true })
 
 const functions = require('firebase-functions')
 
@@ -14,20 +15,32 @@ const {
   getDetails,
   getInitialNotification,
   getNotificationRange,
-  markNotificationAsRead
+  markNotificationAsRead,
+  followUser,
+  unfollowUser
 } = require('./handlers/user')
 
 const {
-  getInitialRecipe,
   getRecipe,
+  getInitialTimelineRecipe,
+  getTimelineRecipeRange,
+  getInitialBookmarkRecipe,
+  getBookmarkRecipeRange,
+  getInitialExploreRecipe,
+  getExploreRecipeRange,
   createRecipe,
   deleteRecipe,
   createComment,
   likeRecipe,
   unlikeRecipe,
   bookmarkRecipe,
-  removeBookmarkRecipe
+  removeBookmarkRecipe,
+  getTags,
+  uploadPicture,
+  deletePicture
 } = require('./handlers/recipe')
+
+app.use(cors)
 
 // User auth routes
 app.post('/signup', handleSignUp)
@@ -42,6 +55,8 @@ app.post(
 app.post('/user/details', firebaseAuthorizationMiddleware, createDetails)
 app.get('/user/details', firebaseAuthorizationMiddleware, getCurrentUserDetails)
 app.get('/user/:handle', getDetails)
+app.get('/user/:handle/follow', firebaseAuthorizationMiddleware, followUser)
+app.get('/user/:handle/unfollow', firebaseAuthorizationMiddleware, unfollowUser)
 
 // Notification handling routes
 app.get(
@@ -61,10 +76,45 @@ app.post(
 )
 
 // Recipe routes
-app.get('/recipe', firebaseAuthorizationMiddleware, getInitialRecipe)
 app.get('/recipe/:id', getRecipe)
 app.post('/recipe', firebaseAuthorizationMiddleware, createRecipe)
 app.delete('/recipe/:id', firebaseAuthorizationMiddleware, deleteRecipe)
+
+// Timeline
+app.get(
+  '/recipes/timeline',
+  firebaseAuthorizationMiddleware,
+  getInitialTimelineRecipe
+)
+app.get(
+  '/recipes/timeline/:createdAt',
+  firebaseAuthorizationMiddleware,
+  getTimelineRecipeRange
+)
+
+// Bookmark
+app.get(
+  '/recipes/bookmark',
+  firebaseAuthorizationMiddleware,
+  getInitialBookmarkRecipe
+)
+app.get(
+  '/recipes/bookmark/:createdAt',
+  firebaseAuthorizationMiddleware,
+  getBookmarkRecipeRange
+)
+
+// Explore
+app.get(
+  '/recipes/explore',
+  firebaseAuthorizationMiddleware,
+  getInitialExploreRecipe
+)
+app.get(
+  '/recipes/explore/:createdAt',
+  firebaseAuthorizationMiddleware,
+  getExploreRecipeRange
+)
 
 // Recipe additions routes
 app.get('/recipe/:id/like', firebaseAuthorizationMiddleware, likeRecipe)
@@ -76,6 +126,19 @@ app.get(
   removeBookmarkRecipe
 )
 app.post('/recipe/:id/comment', firebaseAuthorizationMiddleware, createComment)
+app.get('/tags', firebaseAuthorizationMiddleware, getTags)
+
+app.post(
+  '/recipe/uploadPicture',
+  firebaseAuthorizationMiddleware,
+  uploadPicture
+)
+
+app.get(
+  '/recipe/deletePicture/:imageName',
+  firebaseAuthorizationMiddleware,
+  deletePicture
+)
 
 exports.api = functions.region('europe-west3').https.onRequest(app)
 
@@ -123,7 +186,10 @@ exports.onCommentNotification = functions
       .doc(`/recipes/${querySnapshot.data().recipeId}`)
       .get()
       .then(doc => {
-        if (doc.exists) {
+        if (
+          doc.exists &&
+          querySnapshot.data().userHandle !== doc.data().userHandle
+        ) {
           return db.doc(`/notifications/${querySnapshot.id}`).set({
             recipeId: doc.id,
             type: 'comment',
@@ -168,7 +234,42 @@ exports.onBookmarkRemoveNotification = functions
   .firestore.document('bookmarks/{id}')
   .onDelete(querySnapshot => {
     return db
-      .doc(`/bookmarks/${querySnapshot.id}`)
+      .doc(`/notifications/${querySnapshot.id}`)
+      .delete()
+      .catch(err => {
+        console.log(err)
+      })
+  })
+
+exports.onFollowNotification = functions
+  .region('europe-west3')
+  .firestore.document('follows/{id}')
+  .onCreate(querySnapshot => {
+    return db
+      .doc(`/users/${querySnapshot.data().follows}`)
+      .get()
+      .then(doc => {
+        if (doc.exists) {
+          return db.doc(`/notifications/${querySnapshot.id}`).set({
+            type: 'follow',
+            read: false,
+            sender: querySnapshot.data().userHandle,
+            recipient: doc.data().handle,
+            createdAt: new Date().toISOString()
+          })
+        }
+      })
+      .catch(err => {
+        console.log(err)
+      })
+  })
+
+exports.onUnfollowRemoveNotification = functions
+  .region('europe-west3')
+  .firestore.document('follows/{id}')
+  .onDelete(querySnapshot => {
+    return db
+      .doc(`/notifications/${querySnapshot.id}`)
       .delete()
       .catch(err => {
         console.log(err)

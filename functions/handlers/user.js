@@ -23,7 +23,7 @@ exports.handleSignUp = (req, res) => {
     .get()
     .then(documentSnapshot => {
       if (documentSnapshot.exists) {
-        return res.status(400).json({ handle: 'Handle already in use :(' })
+        return res.status(400).json({ message: 'Handle already in use :(' })
       } else {
         return firebase
           .auth()
@@ -44,14 +44,16 @@ exports.handleSignUp = (req, res) => {
         createdAt: new Date().toISOString(),
         email: user.email,
         handle: user.handle,
-        profilePicture: `https://gravatar.com/avatar/${emailHash}?d=identicon`
+        name: user.name,
+        followCount: 0,
+        profilePicture: `https://gravatar.com/avatar/${emailHash}?d=identicon&s=250`
       }
       return db.doc(`/users/${user.handle}`).set(credentials)
     })
     .then(() => res.status(201).json({ token }))
     .catch(err => {
       if (err === 'auth/email-already-in-use') {
-        res.status(400).json({ email: 'Email already in use :(' })
+        res.status(400).json({ message: 'Email already in use :(' })
       } else {
         res.status(500).json({ error: err })
       }
@@ -87,7 +89,7 @@ exports.uploadProfilePicture = (req, res) => {
   const busboy = new Busboy({ headers: req.headers })
   let imgFilename
   let img = {}
-
+  let profilePicture
   busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
     if (mimetype !== 'image/png' && mimetype !== 'image/jpeg') {
       return res.status(400).json({ error: 'Wrong filetype' })
@@ -116,10 +118,10 @@ exports.uploadProfilePicture = (req, res) => {
         }
       })
       .then(() => {
-        const profilePicture = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/users%2F${req.user.uid}%2F${imgFilename}?alt=media`
+        profilePicture = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/users%2F${req.user.uid}%2F${imgFilename}?alt=media`
         return db.doc(`/users/${req.user.handle}`).update({ profilePicture })
       })
-      .then(() => res.json({ message: 'Image uploaded successfully' }))
+      .then(() => res.status(201).json({ profilePicture: profilePicture }))
       .catch(err => res.status(500).json({ error: err }))
   })
 
@@ -142,7 +144,7 @@ exports.createDetails = (req, res) => {
 }
 
 exports.getCurrentUserDetails = (req, res) => {
-  const user = { likes: [], notifications: [] }
+  const user = { likes: [], notifications: [], bookmarks: [], follows: [] }
 
   db.doc(`/users/${req.user.handle}`)
     .get()
@@ -156,7 +158,7 @@ exports.getCurrentUserDetails = (req, res) => {
       }
     })
     .then(querySnapshot => {
-      querySnapshot.forEach(doc => user.likes.push(doc.data()))
+      querySnapshot.forEach(doc => user.likes.push(doc.data().recipeId))
       return db
         .collection('notifications')
         .where('recipient', '==', req.user.handle)
@@ -168,6 +170,21 @@ exports.getCurrentUserDetails = (req, res) => {
       querySnapshot.forEach(doc =>
         user.notifications.push({ id: doc.id, ...doc.data() })
       )
+      return db
+        .collection('bookmarks')
+        .where('userHandle', '==', req.user.handle)
+        .get()
+    })
+    .then(querySnapshot => {
+      querySnapshot.forEach(doc => user.bookmarks.push(doc.data().recipeId))
+      return db
+        .collection('follows')
+        .where('userHandle', '==', req.user.handle)
+        .get()
+    })
+    .then(querySnapshot => {
+      querySnapshot.forEach(doc => user.follows.push(doc.data().follows))
+
       return res.status(200).json(user)
     })
     .catch(err => res.status(500).json({ error: err }))
@@ -246,4 +263,92 @@ exports.markNotificationAsRead = (req, res) => {
     .commit()
     .then(() => res.status(200).json({ message: 'Notifications read' }))
     .catch(err => res.status(500).json({ error: err }))
+}
+
+exports.followUser = (req, res) => {
+  const followsDocRef = db
+    .collection('follows')
+    .where('userHandle', '==', req.user.handle)
+    .where('follows', '==', req.params.handle)
+    .limit(1)
+  const userDocRef = db.doc(`/users/${req.params.handle}`)
+
+  let user
+
+  userDocRef
+    .get()
+    .then(doc => {
+      if (doc.exists) {
+        user = { id: doc.id, ...doc.data() }
+
+        if (user.handle === req.user.handle) {
+          return res.status(400).json({ error: "You can't follow yourself" })
+        } else {
+          return followsDocRef.get()
+        }
+      } else {
+        return res.status(404).json({ error: 'User not found' })
+      }
+    })
+    .then(querySnapshot => {
+      if (querySnapshot.empty) {
+        return db
+          .collection('follows')
+          .add({ follows: user.handle, userHandle: req.user.handle })
+          .then(() => {
+            user.followCount++
+            return userDocRef.update({ followCount: user.followCount })
+          })
+          .then(() => res.status(201).json(user))
+      } else {
+        return res.status(400).json({ error: 'User already followed' })
+      }
+    })
+    .catch(err => res.status(500).json({ error: err }))
+}
+
+exports.unfollowUser = (req, res) => {
+  const followsDocRef = db
+    .collection('follows')
+    .where('userHandle', '==', req.user.handle)
+    .where('follows', '==', req.params.handle)
+    .limit(1)
+  const userDocRef = db.doc(`/users/${req.params.handle}`)
+
+  let user
+
+  userDocRef
+    .get()
+    .then(doc => {
+      if (doc.exists) {
+        user = { id: doc.id, ...doc.data() }
+
+        if (user.handle === req.user.handle) {
+          return res.status(400).json({ error: "You can't unfollow yourself" })
+        } else {
+          return followsDocRef.get()
+        }
+      } else {
+        return res.status(404).json({ error: 'Recipe not found' })
+      }
+    })
+    .then(querySnapshot => {
+      if (!querySnapshot.empty) {
+        return db
+          .doc(`/follows/${querySnapshot.docs[0].id}`)
+          .delete()
+          .then(() => {
+            user.followCount--
+            return userDocRef.update({ followCount: user.followCount })
+          })
+          .then(() => res.status(200).json(user))
+      } else {
+        return res.status(400).json({ error: 'User not followed' })
+      }
+    })
+    .catch(err => res.status(500).json({ error: err }))
+}
+
+exports.search = (req, res) => {
+  // TODO: ADD ALGORIA SEARCH
 }
